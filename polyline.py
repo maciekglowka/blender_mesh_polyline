@@ -39,9 +39,12 @@ class MESH_OT_draw_polyline(bpy.types.Operator):
     bl_idname = "mga.polyline"
     bl_label = "Draw Polyline"
 
-    def modal(self, context, event):        
+    def modal(self, context, event):       
         if event.type == 'MOUSEMOVE':
             self.mouse_pos = [event.mouse_region_x, event.mouse_region_y]
+
+            self.snapper.check_update(context)
+
             if len(self.verts)>0:
                 self.line_color=(1, 1, 0, 1)
                 v0 = self.verts[-1].co
@@ -57,7 +60,11 @@ class MESH_OT_draw_polyline(bpy.types.Operator):
                     v1 = utils.snap_on_axis(v0,v1,geometry.x_axis)   
                 elif utils.check_axis_snap(dir,geometry.y_axis):
                     self.line_color=(0, 1, 0, 1)
-                    v1 = utils.snap_on_axis(v0,v1,geometry.y_axis)                
+                    v1 = utils.snap_on_axis(v0,v1,geometry.y_axis)     
+
+                sv = self.snapper.get_snapped_vertex(self.mouse_pos)
+                if sv:
+                    v1 = sv           
                                         
                 self.batch = batch_for_shader(shader, 'LINES', {"pos": [v0[:],v1[:]]})
                 context.area.tag_redraw()
@@ -119,9 +126,13 @@ class MESH_OT_draw_polyline(bpy.types.Operator):
         self.snapper = snap.Snapper()
         self.snapper.update_verts_2d(context)
         self.temp_lines_handle = bpy.types.SpaceView3D.draw_handler_add(draw_temp_lines, args, 'WINDOW', 'POST_PIXEL') 
-        self.test_verts = self.snapper.verts_2d
+        self.test_verts = []
         
         return {'RUNNING_MODAL'}
+
+    def cancel(self, context):
+        print("cancel")
+        self.clean(context)
     
     def start_mesh(self, context):
         mesh = context.object.data
@@ -155,7 +166,7 @@ class MESH_OT_draw_polyline(bpy.types.Operator):
         self.dist = 0
         self.dist_str = "0"
         
-    def clean(self,context):
+    def clean(self, context):
         bpy.types.SpaceView3D.draw_handler_remove(self.handle_3d, 'WINDOW')
         bpy.types.SpaceView3D.draw_handler_remove(self.handle_2d, 'WINDOW')
         bpy.types.SpaceView3D.draw_handler_remove(self.temp_lines_handle, 'WINDOW')
