@@ -58,19 +58,24 @@ class MESH_OT_draw_polyline(bpy.types.Operator):
 
             if len(self.verts)>0:
                 v0 = self.verts[-1].co
-            
-                dir = (self.next_vert-v0).normalized()
-
-                if sv==None:
-                    if utils.check_axis_snap(dir,geometry.x_axis,self.workplane):
-                        self.line_color=(1, 0, 0, 1) 
-                        self.next_vert = utils.snap_on_axis(v0,self.next_vert,geometry.x_axis)   
-                    elif utils.check_axis_snap(dir,geometry.y_axis,self.workplane):
-                        self.line_color=(0, 1, 0, 1)
-                        self.next_vert = utils.snap_on_axis(v0,self.next_vert,geometry.y_axis) 
-                    elif utils.check_axis_snap(dir,geometry.z_axis,self.workplane):
-                        self.line_color=(0, 0, 1, 1)
-                        self.next_vert = utils.snap_on_axis(v0,self.next_vert,geometry.z_axis)     
+                self.workplane.origin = v0
+                #dir = (self.next_vert-v0).normalized()
+                #
+                #if sv==None:
+                #    if utils.check_axis_snap(dir,geometry.x_axis,self.workplane):
+                #        self.line_color=(1, 0, 0, 1) 
+                #        self.next_vert = utils.snap_on_axis(v0,self.next_vert,geometry.x_axis)   
+                #    elif utils.check_axis_snap(dir,geometry.y_axis,self.workplane):
+                #        self.line_color=(0, 1, 0, 1)
+                #        self.next_vert = utils.snap_on_axis(v0,self.next_vert,geometry.y_axis) 
+                #    elif utils.check_axis_snap(dir,geometry.z_axis,self.workplane):
+                #        self.line_color=(0, 0, 1, 1)
+                #        self.next_vert = utils.snap_on_axis(v0,self.next_vert,geometry.z_axis)    
+                # 
+                if self.snap_axis!=None:
+                    if self.snap_axis.cross(self.workplane.normal).length!=0:
+                        self.line_color=(self.snap_axis[0],self.snap_axis[1],self.snap_axis[2],1)
+                        self.next_vert = utils.snap_on_axis(v0,self.next_vert,self.snap_axis,self.workplane)
 
                 if self.dist_str=="0":
                     self.dist = (self.next_vert-v0).length 
@@ -90,8 +95,11 @@ class MESH_OT_draw_polyline(bpy.types.Operator):
                     self.clean(context)
                     return {'FINISHED'}
         elif event.type == 'ESC':  # finish
-            self.clean(context)
-            return {'FINISHED'}
+            if self.snap_axis!=None:
+                self.snap_axis=None
+            else:
+                self.clean(context)
+                return {'FINISHED'}
         elif event.type == 'BACK_SPACE':
             if event.value == 'RELEASE':
                 if len(self.dist_str)>1:
@@ -116,6 +124,12 @@ class MESH_OT_draw_polyline(bpy.types.Operator):
                 if self.close_line(context):
                     self.clean(context)
                     return {'FINISHED'}
+            elif char=='x':
+                self.snap_axis = geometry.x_axis
+            elif char=='y':
+                self.snap_axis = geometry.y_axis
+            elif char=='z':
+                self.snap_axis = geometry.z_axis
 
             context.area.tag_redraw()
             return {'RUNNING_MODAL'}
@@ -141,6 +155,8 @@ class MESH_OT_draw_polyline(bpy.types.Operator):
         self.snapper.update_verts_2d(context)
         self.marker_handle = bpy.types.SpaceView3D.draw_handler_add(draw_marker, args, 'WINDOW', 'POST_PIXEL') 
         self.marker_vert = None
+
+        self.snap_axis = None
         
         return {'RUNNING_MODAL'}
 
@@ -183,6 +199,7 @@ class MESH_OT_draw_polyline(bpy.types.Operator):
         self.dist = 0
         self.dist_str = "0"
         self.next_vert = None
+        self.snap_axis = None
 
     def close_line(self, context):
         if len(self.verts)<3:

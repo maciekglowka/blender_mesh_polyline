@@ -8,7 +8,7 @@ axis_snap_angle = 0.1
 ray_max=1.84467e+19
 
 def get_workplane(context, event, origin = mathutils.Vector((0.0, 0.0, 0.0))):
-    m_origin, m_dir = mouse_ray(context,event)
+    m_dir = view3d_utils.region_2d_to_vector_3d(context.region,context.space_data.region_3d,(context.region.width/2,context.region.height/2))
 
     xa = min(m_dir.angle(geometry.x_axis, None),m_dir.angle(-geometry.x_axis, None))
     ya = min(m_dir.angle(geometry.y_axis, None),m_dir.angle(-geometry.y_axis, None))
@@ -36,24 +36,25 @@ def mouse_to_vert(context, event, plane):
     v = mathutils.geometry.intersect_line_plane(m_origin, m_origin + ray_max * m_dir, plane.origin, plane.normal)
     return v   
 
-def check_axis_snap(dir, axis, workplane):
-    if axis.cross(workplane.normal).length==0:
-        return False
-    if dir.length == 0:
-        return False
-    if dir.angle(axis)<axis_snap_angle or dir.angle(-axis)<axis_snap_angle:
-        return True
-    return False    
+#def check_axis_snap(dir, axis, workplane):
+#    if axis.cross(workplane.normal).length==0:
+#        return False
+#    if dir.length == 0:
+#        return False
+#    if dir.angle(axis)<axis_snap_angle or dir.angle(-axis)<axis_snap_angle:
+#        return True
+#    return False    
 
-def snap_on_axis(v0,v1,axis):
-    if axis.x!=0:
-        v1.y=v0.y
-        v1.z=v0.z
-    if axis.y!=0:
-        v1.x=v0.x
-        v1.z=v0.z
-    if axis.z!=0:
-        v1.x=v0.x
-        v1.y=v0.y
+def snap_on_axis(v0,v1,axis,workplane):    
+    other_axis = axis.cross(workplane.normal).normalized()
+
+    v = v1
+
+    if other_axis[0]:
+        v[0]=v0[0]
+    elif other_axis[1]:
+        v[1]=v0[1]
+    if other_axis[2]:
+        v[2]=v0[2]
         
-    return v1
+    return v
