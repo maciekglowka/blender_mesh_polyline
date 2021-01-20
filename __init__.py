@@ -13,7 +13,7 @@ if "bpy" in locals():
         import importlib
 
         try:
-            modules = (geometry,utils,snap,polyline)
+            modules = (geometry,utils,snap,polyline,panel)
             for m in modules:
                 importlib.reload(m)
 
@@ -22,12 +22,14 @@ if "bpy" in locals():
             print(E)
 
 import bpy
-from . import polyline
+from . import polyline, panel
 
 def register():
     bpy.utils.register_class(polyline.MESH_OT_draw_polyline)
     bpy.types.VIEW3D_MT_edit_mesh.append(polyline.menu_func)
+    bpy.utils.register_class(panel.Polyline_PT_main_panel)
 
 
 def unregister():
     bpy.utils.unregister_class(polyline.MESH_OT_draw_polyline)
+    bpy.utils.unregister_class(panel.Polyline_PT_main_panel)

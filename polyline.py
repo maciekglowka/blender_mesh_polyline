@@ -16,7 +16,7 @@ def draw_line(self,context):
     self.batch.draw(shader)
     
 def draw_text(self,context):
-    if len(self.verts)<0:
+    if len(self.verts)<0 or self.dist==0:
         return
 
     font_id = 0
@@ -26,9 +26,8 @@ def draw_text(self,context):
 
 def draw_marker(self,context):
     if self.marker_vert:
-        v = snap.vertex_to_screen(context, self.marker_vert)
-        blf.position(0, v[0], v[1], 0)
-        blf.size(0, 15, 72)
+        blf.position(0,  self.mouse_pos[0]-text_offset[0], self.mouse_pos[1]+text_offset[1], 0)
+        blf.size(0, 15, 96)
         blf.draw(0, "V")
         
 
@@ -57,47 +56,46 @@ class MESH_OT_draw_polyline(bpy.types.Operator):
                 self.marker_vert = None
 
             if len(self.verts)>0:
-                v0 = self.verts[-1].co
+                v0 = context.object.matrix_world @ self.verts[-1].co
                 self.workplane.origin = v0
-                #dir = (self.next_vert-v0).normalized()
-                #
-                #if sv==None:
-                #    if utils.check_axis_snap(dir,geometry.x_axis,self.workplane):
-                #        self.line_color=(1, 0, 0, 1) 
-                #        self.next_vert = utils.snap_on_axis(v0,self.next_vert,geometry.x_axis)   
-                #    elif utils.check_axis_snap(dir,geometry.y_axis,self.workplane):
-                #        self.line_color=(0, 1, 0, 1)
-                #        self.next_vert = utils.snap_on_axis(v0,self.next_vert,geometry.y_axis) 
-                #    elif utils.check_axis_snap(dir,geometry.z_axis,self.workplane):
-                #        self.line_color=(0, 0, 1, 1)
-                #        self.next_vert = utils.snap_on_axis(v0,self.next_vert,geometry.z_axis)    
-                # 
-                if self.snap_axis!=None:
-                    if self.snap_axis.cross(self.workplane.normal).length!=0:
-                        self.line_color=(self.snap_axis[0],self.snap_axis[1],self.snap_axis[2],1)
-                        self.next_vert = utils.snap_on_axis(v0,self.next_vert,self.snap_axis,self.workplane)
+
+                temp_axis = self.snap_axis
+                if self.ortho and temp_axis==None:
+                    d = self.next_vert - v0
+
+                    max_dot = None
+                    if d.length!=0:
+                        for axis in [geometry.x_axis,geometry.y_axis,geometry.z_axis]:
+                            if axis.cross(self.workplane.normal).length == 0:
+                                continue
+                            dot = abs(d.dot(axis))
+                            if max_dot==None or dot>max_dot:
+                                max_dot=dot
+                                temp_axis = axis
+
+                if temp_axis!=None:
+                    self.line_color=(temp_axis[0],temp_axis[1],temp_axis[2],1)
+                    self.next_vert = snap.snap_on_axis(v0,self.next_vert,temp_axis)
 
                 if self.dist_str=="0":
                     self.dist = (self.next_vert-v0).length 
   
-                self.batch = batch_for_shader(shader, 'LINES', {"pos": [v0[:],self.next_vert[:]]})
-                context.area.tag_redraw()
+                self.batch = batch_for_shader(shader, 'LINES', {"pos": [v0[:], self.next_vert[:]]})
+            context.area.tag_redraw()
 
         elif event.type == 'LEFTMOUSE':
             if event.value == 'RELEASE':
                 self.add_vertex(context,event)
 
-        elif event.type == 'RET':
+        elif event.type == 'RET' or event.type == 'SPACE':
             if event.value == 'RELEASE':
                 if self.dist_str!="0":
                     self.add_vertex(context,event)
                 else:
                     self.clean(context)
                     return {'FINISHED'}
+            return {'RUNNING_MODAL'}
         elif event.type == 'ESC':  # finish
-            if self.snap_axis!=None:
-                self.snap_axis=None
-            else:
                 self.clean(context)
                 return {'FINISHED'}
         elif event.type == 'BACK_SPACE':
@@ -109,6 +107,8 @@ class MESH_OT_draw_polyline(bpy.types.Operator):
                 
                 self.dist = float(self.dist_str)
                 context.area.tag_redraw()
+        elif event.type == 'TAB':
+            return {'RUNNING_MODAL'}
         elif event.ascii:
             char = event.ascii
             if char.isdigit() or char=='.':
@@ -125,11 +125,22 @@ class MESH_OT_draw_polyline(bpy.types.Operator):
                     self.clean(context)
                     return {'FINISHED'}
             elif char=='x':
-                self.snap_axis = geometry.x_axis
+                if self.snap_axis == geometry.x_axis:
+                    self.snap_axis = None
+                else:
+                    self.snap_axis = geometry.x_axis
             elif char=='y':
-                self.snap_axis = geometry.y_axis
+                if self.snap_axis == geometry.y_axis:
+                    self.snap_axis = None
+                else:
+                    self.snap_axis = geometry.y_axis
             elif char=='z':
-                self.snap_axis = geometry.z_axis
+                if self.snap_axis == geometry.z_axis:
+                    self.snap_axis = None
+                else:
+                    self.snap_axis = geometry.z_axis
+            elif char=='o':
+                self.ortho = not self.ortho
 
             context.area.tag_redraw()
             return {'RUNNING_MODAL'}
@@ -138,6 +149,7 @@ class MESH_OT_draw_polyline(bpy.types.Operator):
 
     def invoke(self, context, event):
         context.window_manager.modal_handler_add(self)
+        #self.matrix_world = context.object.matrix_world
         self.workplane = geometry.Plane(mathutils.Vector((0.0, 0.0, 0.0)),mathutils.Vector((0.0,0.0,1.0)))
         self.verts = []
         self.next_vert = None
@@ -157,6 +169,7 @@ class MESH_OT_draw_polyline(bpy.types.Operator):
         self.marker_vert = None
 
         self.snap_axis = None
+        self.ortho = True
         
         return {'RUNNING_MODAL'}
 
@@ -166,23 +179,19 @@ class MESH_OT_draw_polyline(bpy.types.Operator):
     
     def start_mesh(self, context):
         mesh = context.object.data
-        self.bm = bmesh.from_edit_mesh(mesh)            
+        self.bm = bmesh.from_edit_mesh(mesh) 
+        self.workplane = geometry.Plane(mathutils.Vector((0.0, 0.0, 0.0)),mathutils.Vector((0.0,0.0,1.0)))           
 
     def add_vertex(self, context, event):
         #v1 = utils.mouse_to_vert(context,event,self.workplane)
         if self.next_vert == None:
             return
 
-        v1 = self.next_vert
+        v1 = context.object.matrix_world.inverted() @ self.next_vert
         
         if len(self.verts)>0:
             v0 = self.verts[-1].co
             dir = (v1-v0).normalized()
-            
-            #if utils.check_axis_snap(dir,geometry.x_axis):
-            #    v1 = utils.snap_on_axis(v0,v1,geometry.x_axis) 
-            #elif utils.check_axis_snap(dir,geometry.y_axis):
-            #    v1 = utils.snap_on_axis(v0,v1,geometry.y_axis) 
                 
             if self.dist!=0: 
                 dir = (v1-v0).normalized()
@@ -193,9 +202,11 @@ class MESH_OT_draw_polyline(bpy.types.Operator):
         
         if len(self.verts)>1:
             self.bm.edges.new((self.verts[-2],self.verts[-1]))
-        
+    
         bmesh.update_edit_mesh(context.object.data)
-        
+        context.object.update_from_editmode()
+        self.snapper.update_verts_2d(context)
+
         self.dist = 0
         self.dist_str = "0"
         self.next_vert = None

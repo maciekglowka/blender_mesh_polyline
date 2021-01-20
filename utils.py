@@ -4,7 +4,7 @@ import mathutils
 from bpy_extras import view3d_utils
 from . import geometry
         
-axis_snap_angle = 0.1
+#axis_snap_angle = 0.1
 ray_max=1.84467e+19
 
 def get_workplane(context, event, origin = mathutils.Vector((0.0, 0.0, 0.0))):
@@ -34,27 +34,4 @@ def mouse_ray(context, event):
 def mouse_to_vert(context, event, plane):
     m_origin, m_dir = mouse_ray(context,event)
     v = mathutils.geometry.intersect_line_plane(m_origin, m_origin + ray_max * m_dir, plane.origin, plane.normal)
-    return v   
-
-#def check_axis_snap(dir, axis, workplane):
-#    if axis.cross(workplane.normal).length==0:
-#        return False
-#    if dir.length == 0:
-#        return False
-#    if dir.angle(axis)<axis_snap_angle or dir.angle(-axis)<axis_snap_angle:
-#        return True
-#    return False    
-
-def snap_on_axis(v0,v1,axis,workplane):    
-    other_axis = axis.cross(workplane.normal).normalized()
-
-    v = v1
-
-    if other_axis[0]:
-        v[0]=v0[0]
-    elif other_axis[1]:
-        v[1]=v0[1]
-    if other_axis[2]:
-        v[2]=v0[2]
-        
-    return v
+    return v     

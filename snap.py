@@ -7,6 +7,23 @@ SNAP_TRESHOLD = 25
 def vertex_to_screen(context, v):
     return view3d_utils.location_3d_to_region_2d(context.region, context.space_data.region_3d, v)
 
+def snap_on_axis(v0,v1,axis):    
+    #other_axis = axis.cross(workplane.normal).normalized()
+
+    #if other_axis[0]:
+    #    v[0]=v0[0]
+    #elif other_axis[1]:
+    #    v[1]=v0[1]
+    #if other_axis[2]:
+    #    v[2]=v0[2]
+    v = mathutils.Vector(v0.xyz)
+
+    for idx in range(3):
+        if axis[idx]!=0:
+            v[idx] = v1[idx]
+        
+    return v
+
 class Snapper:
     def __init__(self):
         self.verts_3d = None
